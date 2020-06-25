@@ -7,6 +7,9 @@ import org.jsoup.select.Elements;
 
 import java.util.Objects;
 
+/**
+ * Класс для парсинга сайта посредством jsoup
+ */
 public class SqlRuParse {
     /**
      * Общая идея:
