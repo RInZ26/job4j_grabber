@@ -8,54 +8,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.DateFormatSymbols;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 /**
  * Класс для парсинга сайта посредством jsoup
  */
 public class SqlRuParse {
-
+    /**
+     * Наш логгер и наконец-то с properties!
+     */
     private static final Logger LOG = LoggerFactory.getLogger(
             SqlRuParse.class.getName());
     /**
-     * Для хранения уже отпарсенных дат
-     */
-    private List<Date> dates = new ArrayList<>();
-    /**
      * Дата парсинга сайта, чтобы учитывать корректность "сегодня/вчера" у дат
      */
-    private Date parsingDate;
-    private DateFormatSymbols ruDate = new DateFormatSymbols() {
+    private Calendar parsingDate = new GregorianCalendar();
 
-        @Override
-        public String[] getMonths() {
-            return new String[]{"янв", "фев", "мар", "апр", "май", "июн", "июл",
-                    "авг", "сеп", "окт", "ноя", "дек"};
-        }
-    };
-
-    private Dispatcher dispatcher = new Dispatcher();
-    private String datePattern = "d MMM yy, k:mm";
-
-    /**
-     * Общая идея:
-     * Захватываем всю таблицу, далее дробим её по тегу tr - это одна
-     * конкретная запись, иными словами строка в таблице. Но, вперемешку с
-     * системными (Заголовочная tr), поэтому нужна проверка на Null, когда мы
-     * ищем по классу .postslisttopic - это ликвидная строка в таблице с темой
-     *
-     * Из минусов - идёт работа с child через индекс - это не совсем хорошо,
-     * можно упасть с IndexOutOfBounds
-     */
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         SqlRuParse sqlRuParse = new SqlRuParse();
-        sqlRuParse.parseDoc().forEach(System.out::println);
-
-        sqlRuParse.parseDate(sqlRuParse.parseDoc());
-        sqlRuParse.dates.forEach(System.out::println);
+        sqlRuParse.parseDate(sqlRuParse.parseDoc())
+                  .forEach(calendar -> System.out.println(calendar.getTime()));
     }
 
     /**
@@ -70,7 +44,7 @@ public class SqlRuParse {
         try {
             Document doc = Jsoup.connect("https://www.sql.ru/forum/job-offers")
                                 .get();
-            parsingDate = new Date();
+            parsingDate.setTime(new Date());
             Elements rows = doc.select(".forumTable").select("tr");
             for (Element row : rows) {
                 if (Objects.isNull(row.select(".postslisttopic").first())) {
@@ -79,62 +53,142 @@ public class SqlRuParse {
                 rawDates.add(row.child((5)).text());
             }
         } catch (Exception e) {
-            LOG.error("Проблема с подклчением к сайту в parseDoc", e);
+            LOG.error("Проблема с подключением к сайту в parseDoc", e);
         }
-        //"MMM"
         return rawDates;
     }
 
-    public void parseDate(List<String> rawDates) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(datePattern, ruDate);
-        try {
-            for (String rawDate : rawDates) {
-                dates.add(
-                        dispatcher.functions.getOrDefault(rawDate.split(",")[0],
-                                                          (() -> {
-                                                              try {
-                                                                  return dateFormat
-                                                                          .parse(rawDate);
-                                                              } catch (ParseException e) {
-                                                                  e.printStackTrace();
-                                                              }
-                                                              return null;
-                                                          })).get());
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+    /** Парсит уже непосредственно даты, которые мы набрали в parseDoc */
+    public List<Calendar> parseDate(List<String> rawDates) {
+        List<Calendar> dates = new ArrayList();
+        Dispatcher dispatcher = new Dispatcher(parsingDate, LOG);
+        rawDates.forEach(rawLine -> dates.add(
+                dispatcher.getFunctions(rawLine.split(",")[0]).apply(rawLine)));
+        return dates;
+    }
+}
+
+/**
+ * Диспатчер, так как у нас есть сегодня/вчера как опции + он сам делает всю
+ * грязную работу по парсингу
+ */
+class Dispatcher {
+    private static final String TODAY = "сегодня";
+    private static final String YESTERDAY = "вчера";
+
+    /** Шаблон дефолтной даты вида 24 июн 20, 06:53 */
+    private String defaultDatePat = "d MMM yy, k:mm";
+    /** Для парсинга дефолтных дат */
+    private SimpleDateFormat defaultDateFormat = new SimpleDateFormat(
+            defaultDatePat, new DateFormatSymbols() {
+        @Override
+        public String[] getMonths() {
+            return new String[]{"янв", "фев", "мар", "апр", "май", "июн", "июл",
+                    "авг", "сеп", "окт", "ноя", "дек"};
         }
+    });
+    /** Мапа функций по ключевым словам - реализация диспатчера */
+    private Map<String, Function<String, Calendar>> functions = new HashMap<>();
+
+    /**
+     * Время парсинга сайта, чтобы понимать что такое "сегодня" и "вчера"
+     */
+    private final Calendar parsingTime;
+
+    /** Ссылка на родной логгер */
+    private final Logger log;
+
+    /**
+     * Лучше дружить не ссылкой на calendar из парсера, а иметь копию
+     * всё-таки, потому что мало ли там во время выполнения этого, вызовется
+     * новый запрос к сайту и календарь испортится
+     *
+     * @param calendar
+     * @param log
+     */
+    Dispatcher(Calendar calendar, Logger log) {
+        init();
+        this.parsingTime = new GregorianCalendar();
+        this.parsingTime.setTime(calendar.getTime());
+        cleanCalendar(parsingTime);
+        this.log = log;
     }
 
-    private class Dispatcher {
-        private Map<String, Supplier<Date>> functions = new HashMap<>();
-        private final String today = "сегодня";
-        private final String yesterday = "вчера";
+    /**
+     * Заполнение мапы созданными функциями
+     */
+    private void init() {
+        functions.put(TODAY, todayFunction());
+        functions.put(YESTERDAY, yesterdayFunction());
+    }
 
-        Dispatcher() {
-            init();
-        }
+    /**
+     * Счищает поля минут/часов/секунд у календаря, чтобы ему можно было
+     * "некрасивым" образом их задать через dat
+     */
+    private void cleanCalendar(Calendar calendar) {
+        calendar.clear(Calendar.HOUR_OF_DAY);
+        calendar.clear(Calendar.HOUR);
+        calendar.clear(Calendar.MINUTE);
+        calendar.clear(Calendar.SECOND);
+        calendar.clear(Calendar.MILLISECOND);
+    }
 
-        private void init() {
-            functions.put(today, todaySuppplier());
-            functions.put(yesterday, yesterdaySupplier());
-        }
+    /**
+     * Возвращает функцию, которая парсит "сегодня, [hh/mm]"
+     */
+    private Function<String, Calendar> todayFunction() {
+        return (dateStr) -> {
+            Calendar calendar = new GregorianCalendar();
+            calendar.setTime(parsingTime.getTime());
+            StringBuffer stringBuffer = new StringBuffer(dateStr);
+            String[] splitted = stringBuffer.substring(
+                    dateStr.indexOf(", ") + 2).split(":");
+            try {
+                calendar.set(Calendar.HOUR_OF_DAY,
+                             Integer.parseInt(splitted[0]));
+                calendar.set(Calendar.MINUTE, Integer.parseInt(splitted[1]));
+            } catch (IndexOutOfBoundsException e) { //FIXME ? ловим рантайм
+                log.error("корявая запись", e);
+            } catch (Exception e) {
+                log.error("todayFunction", e);
+            }
+            return calendar;
+        };
+    }
 
-        Supplier<Date> todaySuppplier() {
-            return () -> getToday();
-        }
+    /**
+     * Возвращает функцию, которая парсит "вчера, [hh/mm]"
+     */
+    private Function<String, Calendar> yesterdayFunction() {
+        return (dateStr) -> {
+            Calendar calendar = todayFunction().apply(dateStr);
+            calendar.add(Calendar.DAY_OF_MONTH, -1);
+            return calendar;
+        };
+    }
 
-        Supplier<Date> yesterdaySupplier() {
-            return () -> getYesterday();
-        }
+    /** Дефолтная функция, для работы с нормальной датой */
+    private Function<String, Calendar> defaultFunction() {
+        return (dataStr) -> {
+            Calendar calendar = new GregorianCalendar();
+            try {
+                calendar.setTime(defaultDateFormat.parse(dataStr));
+            } catch (Exception e) {
+                log.error("Парсинг упал", e);
+            }
+            return calendar;
+        };
+    }
 
-        private Date getToday() {
-            return SqlRuParse.this.parsingDate;
-        }
-
-        private Date getYesterday() {
-            long day = 60 * 60 * 24;
-            return new Date(getToday().getTime() - day);
-        }
+    /**
+     * Псеведогеттер для мапы функций
+     *
+     * @param query
+     *
+     * @return
+     */
+    public Function<String, Calendar> getFunctions(String query) {
+        return functions.getOrDefault(query, defaultFunction());
     }
 }
