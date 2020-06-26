@@ -19,5 +19,5 @@ notifications:
     recipients:
       - ivs1996@mail.ru
       - djkill59@mail.ru
-    on_success: always # default: change
+    on_success: never # default: change
     on_failure: always # default: always
