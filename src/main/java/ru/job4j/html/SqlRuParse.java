@@ -7,11 +7,13 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.UnknownHostException;
 import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Класс для парсинга сайта посредством jsoup
@@ -27,12 +29,38 @@ public class SqlRuParse {
      */
     private Calendar parsingDate = new GregorianCalendar();
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         SqlRuParse sqlRuParse = new SqlRuParse();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd MM yy, kk:mm");
-        sqlRuParse.parseDate(sqlRuParse.parseDoc())
-                  .forEach(calendar -> System.out.println(
-                          dateFormat.format(calendar.getTime())));
+        SimpleDateFormat dateFormat = new SimpleDateFormat(
+                "dd MMMM YYYY года, kk часов : mm минут", Locale.getDefault());
+        String url = "https://www.sql.ru/forum/job-offers/";
+        sqlRuParse.parseDatesBetween(1, 5, url)
+                  .forEach(date -> System.out.println(dateFormat.format(date.getTime())));
+    }
+
+    /**
+     * Парсит данные с сайта в промежутке start-finish.
+     * Никакие try-catch не нужны, всё уже учтено в используемых методах
+     *
+     * @param start  начало поиска
+     * @param finish конец поиска
+     * @param url    url любой по номеру страницы, которые нужно парсить
+     *
+     * @return объединненая коллекцию
+     */
+    public List<Calendar> parseDatesBetween(int start, int finish, String url) {
+        if (start < 0 || finish < 0 || finish < start || Objects.isNull(url)) {
+            LOG.warn("Неадекватные данные в parseDatesBetween");
+            return Collections.emptyList();
+        }
+        var result = new ArrayList<Calendar>();
+        StringBuilder defaultUrl = new StringBuilder(url);
+        for (int c = start; c <= finish; c++) {
+            defaultUrl.delete(defaultUrl.lastIndexOf("/") + 1,
+                              defaultUrl.length()).append(c);
+            result.addAll(parseDate(parseDoc(defaultUrl.toString())));
+        }
+        return result;
     }
 
     /**
@@ -42,11 +70,10 @@ public class SqlRuParse {
      * будет child(5), что и является датой
      * Результаты заносим в список для последующей обработки
      */
-    public List<String> parseDoc() {
+    public List<String> parseDoc(String url) {
         List<String> rawDates = new ArrayList<>();
         try {
-            Document doc = Jsoup.connect("https://www.sql.ru/forum/job-offers")
-                                .get();
+            Document doc = Jsoup.connect(url).get();
             parsingDate.setTime(new Date());
             Elements rows = doc.select(".forumTable").select("tr");
             for (Element row : rows) {
@@ -55,8 +82,10 @@ public class SqlRuParse {
                 }
                 rawDates.add(row.child((5)).text());
             }
-        } catch (Exception e) {
+        } catch (UnknownHostException e) {
             LOG.error("Проблема с подключением к сайту в parseDoc", e);
+        } catch (Exception e) {
+            LOG.error("parseDoc упал", e);
         }
         return rawDates;
     }
@@ -197,7 +226,8 @@ class Dispatcher {
 
     /**
      * Дефолтная функция, для работы с нормальной датой.
-     * Используется предварительно clear, чтобы дата при Exception'e на выходе
+     * Используется предварительно clear, чтобы дата при Exception'e на
+     * выходе
      * была "явно не такой" как все и это можно было бы увидеть
      */
     private Function<String, Calendar> defaultFunction() {
@@ -215,7 +245,8 @@ class Dispatcher {
 
     /**
      * Псеведогеттер для мапы функций
-     * Псевдо, потому что возвращает не саму мапу (это нехорошо), а выполняет
+     * Псевдо, потому что возвращает не саму мапу (это нехорошо), а
+     * выполняет
      * её работу
      */
     public Function<String, Calendar> getFunctions(String query) {
