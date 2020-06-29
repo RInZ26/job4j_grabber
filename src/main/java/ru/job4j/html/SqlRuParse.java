@@ -11,6 +11,7 @@ import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 /**
  * Класс для парсинга сайта посредством jsoup
@@ -26,10 +27,12 @@ public class SqlRuParse {
      */
     private Calendar parsingDate = new GregorianCalendar();
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         SqlRuParse sqlRuParse = new SqlRuParse();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("dd MM yy, kk:mm");
         sqlRuParse.parseDate(sqlRuParse.parseDoc())
-                  .forEach(calendar -> System.out.println(calendar.getTime()));
+                  .forEach(calendar -> System.out.println(
+                          dateFormat.format(calendar.getTime())));
     }
 
     /**
@@ -58,12 +61,23 @@ public class SqlRuParse {
         return rawDates;
     }
 
-    /** Парсит уже непосредственно даты, которые мы набрали в parseDoc */
+    /**
+     * Парсит уже непосредственно даты, которые мы набрали в parseDoc
+     * В качестве ключа для мапы используется фраза до запятой. С IndexOutOf
+     * мы всё равно не упадём, так как индекс 0, а если что-то не так -
+     * вернётся дефолтная функция
+     */
     public List<Calendar> parseDate(List<String> rawDates) {
         List<Calendar> dates = new ArrayList();
         Dispatcher dispatcher = new Dispatcher(parsingDate, LOG);
-        rawDates.forEach(rawLine -> dates.add(
-                dispatcher.getFunctions(rawLine.split(",")[0]).apply(rawLine)));
+        for (String rawDate : rawDates) {
+            if (dispatcher.RIGHT_DATE.matcher(rawDate).matches()) {
+                dates.add(dispatcher.getFunctions(rawDate.split(",")[0])
+                                    .apply(rawDate));
+            } else {
+                LOG.warn("Дата - не дата. Входные данные ошибочны");
+            }
+        }
         return dates;
     }
 }
@@ -73,6 +87,14 @@ public class SqlRuParse {
  * грязную работу по парсингу
  */
 class Dispatcher {
+    /**
+     * Регулярка для проверки, что перед нами что-то "похожее" на дату
+     * Хотя по факту, она не спасает от падения в SimpleDateFormat parse()
+     * Но всё равно должна быть полезной, т.к. позволяет "спокойно" работать
+     * с  todayFunction и т.д.
+     */
+    public static final Pattern RIGHT_DATE = Pattern.compile(
+            "((\\d{1,2} [а-я]{3} \\d{1,2})|([а-яА-Я]+)), \\d{2}:\\d{2}");
     private static final String TODAY = "сегодня";
     private static final String YESTERDAY = "вчера";
 
@@ -87,15 +109,18 @@ class Dispatcher {
                     "авг", "сеп", "окт", "ноя", "дек"};
         }
     });
+
     /** Мапа функций по ключевым словам - реализация диспатчера */
     private Map<String, Function<String, Calendar>> functions = new HashMap<>();
 
     /**
-     * Время парсинга сайта, чтобы понимать что такое "сегодня" и "вчера"
+     * Время парсинга сайта, чтобы понимать что такое "сегодня" и "вчера".
+     * Мы не можем пользоваться просто ссылкой на calendar, мало ли как он
+     * изменится дальше. А нужно именно время на момент парсинга
      */
     private final Calendar parsingTime;
 
-    /** Ссылка на родной логгер */
+    /** Ссылка на родной логгер. */
     private final Logger log;
 
     /**
@@ -135,7 +160,11 @@ class Dispatcher {
     }
 
     /**
-     * Возвращает функцию, которая парсит "сегодня, [hh/mm]"
+     * Возвращает функцию, которая парсит "сегодня, [hh:mm]"
+     * Мы можем спокойно делать эти IndexOf и прочее, потому что
+     * предварительно мы проверяем все даты через RIGHT_DATE =>
+     * с indexOutOfBounds не должны упасть
+     * Хотя и выглядит некрасиво
      */
     private Function<String, Calendar> todayFunction() {
         return (dateStr) -> {
@@ -148,8 +177,6 @@ class Dispatcher {
                 calendar.set(Calendar.HOUR_OF_DAY,
                              Integer.parseInt(splitted[0]));
                 calendar.set(Calendar.MINUTE, Integer.parseInt(splitted[1]));
-            } catch (IndexOutOfBoundsException e) { //FIXME ? ловим рантайм
-                log.error("корявая запись", e);
             } catch (Exception e) {
                 log.error("todayFunction", e);
             }
@@ -168,10 +195,15 @@ class Dispatcher {
         };
     }
 
-    /** Дефолтная функция, для работы с нормальной датой */
+    /**
+     * Дефолтная функция, для работы с нормальной датой.
+     * Используется предварительно clear, чтобы дата при Exception'e на выходе
+     * была "явно не такой" как все и это можно было бы увидеть
+     */
     private Function<String, Calendar> defaultFunction() {
         return (dataStr) -> {
             Calendar calendar = new GregorianCalendar();
+            calendar.clear();
             try {
                 calendar.setTime(defaultDateFormat.parse(dataStr));
             } catch (Exception e) {
@@ -183,10 +215,8 @@ class Dispatcher {
 
     /**
      * Псеведогеттер для мапы функций
-     *
-     * @param query
-     *
-     * @return
+     * Псевдо, потому что возвращает не саму мапу (это нехорошо), а выполняет
+     * её работу
      */
     public Function<String, Calendar> getFunctions(String query) {
         return functions.getOrDefault(query, defaultFunction());
