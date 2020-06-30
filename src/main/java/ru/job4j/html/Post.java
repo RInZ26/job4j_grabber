@@ -1,7 +1,8 @@
 package ru.job4j.html;
 
-import java.util.Calendar;
+import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.StringJoiner;
 
 /**
  * Класс - модель данных
@@ -11,35 +12,46 @@ public class Post {
      * Название темы
      */
     private String topicName;
+
     /**
      * Юрлька темы - сердце поста
      */
     private final String topicUrl;
+
     /**
      * Ник автора темы
      */
     private String authorName;
+
     /**
      * Юрлька автора
      */
     private String authorUrl;
+
     /**
      * Количество постов (кроме первого поста автора) в теме
      */
     private short answers;
+
     /**
      * Количество просмотров темы
      */
     private int views;
+
     /**
      * Дата последнего поста в теме
      */
-    private Calendar lastUpdated;
+    private LocalDateTime lastUpdated;
 
     /**
-     * Статус поста, изначально открыт
+     * Описание вакансии - первый пост
      */
-    private PostStatus postStatus = PostStatus.OPENED;
+    private String description;
+
+    /**
+     * Когда тема создана
+     */
+    private LocalDateTime created;
 
     /**
      * Основной конструктор - очевидно по url, без него заявки быть не может
@@ -48,58 +60,6 @@ public class Post {
      */
     public Post(String topicUrl) {
         this.topicUrl = topicUrl;
-    }
-
-    public Post(String topicName, String topicUrl, String authorName,
-                String authorUrl, short answers, int views,
-                Calendar lastUpdated) {
-        this(topicUrl);
-        this.topicName = topicName;
-        this.authorName = authorName;
-        this.authorUrl = authorUrl;
-        this.answers = answers;
-        this.views = views;
-        this.lastUpdated = lastUpdated;
-    }
-
-    public Post(String topicName, String topicUrl, String authorName,
-                String authorUrl, short answers, int views,
-                Calendar lastUpdated, PostStatus postStatus) {
-        this(topicName, topicUrl, authorName, authorUrl, answers, views,
-             lastUpdated);
-        this.postStatus = postStatus;
-    }
-
-    public String getTopicName() {
-        return topicName;
-    }
-
-    public String getTopicUrl() {
-        return topicUrl;
-    }
-
-    public String getAuthorName() {
-        return authorName;
-    }
-
-    public String getAuthorUrl() {
-        return authorUrl;
-    }
-
-    public short getAnswers() {
-        return answers;
-    }
-
-    public int getViews() {
-        return views;
-    }
-
-    public Calendar getLastUpdated() {
-        return lastUpdated;
-    }
-
-    public PostStatus getPostStatus() {
-        return postStatus;
     }
 
     /**
@@ -125,17 +85,76 @@ public class Post {
         return Objects.hash(topicUrl);
     }
 
-    /**
-     * Мало ли сколько там может быть статусов у постов кроме "закрыт" -
-     * лучше сделать сразу перечисление
-     */
-    public enum PostStatus {
-        CLOSED("закрыт"), OPENED("");
+    @Override
+    public String toString() {
+        return topicName + " " + topicUrl + " " + description;
+    }
 
-        private String name;
+    public String getTopicName() {
+        return topicName;
+    }
 
-        PostStatus(String name) {
-            this.name = name;
-        }
+    public void setTopicName(String topicName) {
+        this.topicName = topicName;
+    }
+
+    public String getTopicUrl() {
+        return topicUrl;
+    }
+
+    public String getAuthorName() {
+        return authorName;
+    }
+
+    public void setAuthorName(String authorName) {
+        this.authorName = authorName;
+    }
+
+    public String getAuthorUrl() {
+        return authorUrl;
+    }
+
+    public void setAuthorUrl(String authorUrl) {
+        this.authorUrl = authorUrl;
+    }
+
+    public short getAnswers() {
+        return answers;
+    }
+
+    public void setAnswers(short answers) {
+        this.answers = answers;
+    }
+
+    public int getViews() {
+        return views;
+    }
+
+    public void setViews(int views) {
+        this.views = views;
+    }
+
+    public LocalDateTime getLastUpdated() {
+        return lastUpdated;
+    }
+
+    public void setLastUpdated(LocalDateTime lastUpdated) {
+        this.lastUpdated = lastUpdated;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public LocalDateTime getCreated() {
+        return created;
+    }
+
+    public void setCreated(LocalDateTime created) {
+        this.created = created;
     }
 }
