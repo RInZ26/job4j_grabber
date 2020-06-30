@@ -4,40 +4,38 @@ import org.junit.Test;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Collections;
-import java.util.GregorianCalendar;
 
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 
-public class sqlRuParseDatesTest {
+public class SqlRuDateParserTest {
 
     @Test
     public void ifListEmptyThenEmpty() {
-        assertThat(new SqlRuParseDates().parseDates(Collections.EMPTY_LIST),
+        assertThat(new SqlRuDateParser().parseDates(Collections.EMPTY_LIST),
                    is(Collections.emptyList()));
     }
 
     @Test (expected = NullPointerException.class)
     public void ifDataIsDirtyWhenNPE()  {
-        SqlRuParseDates sqlRuParseDates = new SqlRuParseDates();
-        LocalDateTime actual = sqlRuParseDates.parseDates(
+        SqlRuDateParser sqlRuDateParser = new SqlRuDateParser();
+        LocalDateTime actual = sqlRuDateParser.parseDates(
                 Arrays.asList("24 оой 20, 07:01")).get(0);
     }
 
     @Test
     public void ifDataIsNotDateWhenPatternWorkThenNull() {
-        SqlRuParseDates sqlRuParseDates = new SqlRuParseDates();
+        SqlRuDateParser sqlRuDateParser = new SqlRuDateParser();
         assertNull(
-                sqlRuParseDates.parseDates(Arrays.asList(
+                sqlRuDateParser.parseDates(Arrays.asList(
                         "ЗдесьМоглаБытьРеклама")).get(0));
     }
 
     @Test
     public void whenDataOk() {
-        var actual = new SqlRuParseDates().parseDates(
+        var actual = new SqlRuDateParser().parseDates(
                 Arrays.asList("сегодня, 09:57", "вчера, 10:56",
                               "2 дек 19, 22:29"));
         LocalDateTime today = LocalDateTime.now();

@@ -18,12 +18,12 @@ import java.util.stream.Collectors;
 /**
  * Класс для парсинга дат с сайта Sql.ru посредством Jsoup
  */
-public class SqlRuParseDates {
+public class SqlRuDateParser {
     /**
      * Логгер
      */
     private static final Logger LOG = LoggerFactory.getLogger(
-            SqlRuParseDates.class.getName());
+            SqlRuDateParser.class.getName());
     /**
      * Мапа - вместо dateFormat, чтобы правильно парсить месяцы вида MMM с
      * тремя русскими
@@ -51,8 +51,8 @@ public class SqlRuParseDates {
      */
     private static final Map<String, Function<String, LocalDateTime>> DISPATCHER = new HashMap<>() {
         {
-            put("сегодня", SqlRuParseDates::todayFunction);
-            put("вчера", SqlRuParseDates::yesterdayFunction);
+            put("сегодня", SqlRuDateParser::todayFunction);
+            put("вчера", SqlRuDateParser::yesterdayFunction);
         }
     };
 
@@ -124,6 +124,9 @@ public class SqlRuParseDates {
     /**
      * Парсит, если может, дату.
      * Если не может - возвращает null и фиксирует в логе.
+     * Стоит понимать, что паттерн не проверяет корректность месяца на
+     * наличие в RU_Months. И метод может выкинуть NPE, если rawDate содержит
+     * некорректный месяц.
      *
      * @param rawDate парсируемое выражение
      */
@@ -134,7 +137,7 @@ public class SqlRuParseDates {
             return null;
         }
         return DISPATCHER.getOrDefault(rawDate.split(",")[0].trim(),
-                                       SqlRuParseDates::defaultFunction)
+                                       SqlRuDateParser::defaultFunction)
                          .apply(rawDate);
     }
 
@@ -143,7 +146,7 @@ public class SqlRuParseDates {
      */
     public static List<LocalDateTime> parseDates(List<String> rawDate) {
         return rawDate.stream()
-                      .map(SqlRuParseDates::parseDate)
+                      .map(SqlRuDateParser::parseDate)
                       .collect(Collectors.toList());
     }
 
