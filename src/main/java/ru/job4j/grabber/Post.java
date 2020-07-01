@@ -1,8 +1,7 @@
-package ru.job4j.html;
+package ru.job4j.grabber;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
-import java.util.StringJoiner;
 
 /**
  * Класс - модель данных
