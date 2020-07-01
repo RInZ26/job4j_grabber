@@ -6,7 +6,6 @@ import org.jsoup.nodes.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -37,29 +36,17 @@ public class SqlRuPostParser implements Parse<Post> {
                 }
                 String url = postsListTopic.child(0)
                                            .attr("href");
-                Post post = parsePost(url);
-
-                post.setAnswers(Short.parseShort(tr.child(3)
-                                                   .text()));
-                post.setViews(Integer.parseInt(tr.child(4)
-                                                 .text()));
-                post.setLastUpdated(SqlRuDateParser.parseDate(
-                        tr.select(".altCol")
-                          .get(1)
-                          .text()));
-                posts.add(post);
+                posts.add(parsePost(url));
             }
-        } catch (IOException e) {
-            LOG.warn("Некорректный url", e);
+        } catch (Exception e) {
+            LOG.error("Произошло что-то страшное в parsePosts {}", pageUrl, e);
         }
         return posts;
     }
 
     /**
-     * Думаю лучше заполнять post по ходу парсинга, то есть не дожидаться,
-     * когда всё запарсится и потом уже присваивать, а делать это сразу -в
-     * таком случае мы хоть и можем получить "огрозочный" пост, но идейно это
-     * лучше чем просто пустой. Всё равно LOG есть
+     * Парсит топик, а именно первый пост в теме.
+     *
      * Каждый пост сопровождается плавующим тегом new и обойти
      * его можно только извращениями со String, потому что никакими другими
      * способами отделить text ДО класса newMessage в блоке которого и
@@ -73,26 +60,17 @@ public class SqlRuPostParser implements Parse<Post> {
                                 .get();
             Element table = doc.selectFirst(".msgTable");
             Element messageHeader = table.selectFirst(".messageHeader");
-            Element author = table.select("tr")
-                                  .get(1)
-                                  .selectFirst(".msgBody");
             result.setDescription(table.select("tr")
                                        .get(1)
                                        .select("td")
                                        .get(1)
                                        .text());
             result.setTopicName(eraseTags(messageHeader.text()));
-            result.setAuthorUrl(author.child(0)
-                                      .attr("href"));
-            result.setAuthorName(author.child(0)
-                                       .text());
             result.setCreated(SqlRuDateParser.parseDate(eraseTags(
                     table.selectFirst(".msgFooter")
                          .text())));
-        } catch (IOException e) {
-            LOG.error("Не удалось подключиться в parsePost", e);
         } catch (Exception e) {
-            LOG.error("Произошло что-то страшное в parsePost", e);
+            LOG.error("Произошло что-то страшное в parsePost {}", pageUrl, e);
         }
         return result;
     }
@@ -112,10 +90,5 @@ public class SqlRuPostParser implements Parse<Post> {
             stringBuilder.delete(startBracket, stringBuilder.length());
         }
         return stringBuilder.toString();
-    }
-
-    public static void main(String[] args) {
-        new SqlRuPostParser().parsePosts("https://www.sql.ru/forum/job-offers")
-                             .forEach(System.out::println);
     }
 }

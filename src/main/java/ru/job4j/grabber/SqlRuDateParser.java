@@ -137,9 +137,14 @@ public class SqlRuDateParser {
             LOG.warn("Парсинг даты невозможен из-за некорректного формата");
             return null;
         }
-        return DISPATCHER.getOrDefault(rawDate.split(",")[0],
-                                       SqlRuDateParser::defaultFunction)
-                         .apply(rawDate);
+        try {
+            return DISPATCHER.getOrDefault(rawDate.split(",")[0],
+                                           SqlRuDateParser::defaultFunction)
+                             .apply(rawDate);
+        } catch (Exception e) {
+            LOG.error("Дата прошла проверку, но не запарсилась {}", rawDate, e);
+            return null;
+        }
     }
 
     /**
