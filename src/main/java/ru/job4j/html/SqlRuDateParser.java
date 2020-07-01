@@ -131,12 +131,13 @@ public class SqlRuDateParser {
      * @param rawDate парсируемое выражение
      */
     public static LocalDateTime parseDate(String rawDate) {
+        rawDate = rawDate.trim();
         if (!RIGHT_DATE_FORMAT.matcher(rawDate)
                               .matches()) {
             LOG.warn("Парсинг даты невозможен из-за некорректного формата");
             return null;
         }
-        return DISPATCHER.getOrDefault(rawDate.split(",")[0].trim(),
+        return DISPATCHER.getOrDefault(rawDate.split(",")[0],
                                        SqlRuDateParser::defaultFunction)
                          .apply(rawDate);
     }
