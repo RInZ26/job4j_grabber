@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class SqlRuPostParser {
+public class SqlRuPostParser implements Parse<Post> {
     /**
      * logger
      */
@@ -23,7 +23,8 @@ public class SqlRuPostParser {
      *
      * @return Лист с инфой обо всех постах на странице
      */
-    public static List<Post> parsePost(String pageUrl) {
+    @Override
+    public List<Post> parsePosts(String pageUrl) {
         List<Post> posts = new ArrayList<>();
         try {
             Document doc = Jsoup.connect(pageUrl)
@@ -34,15 +35,10 @@ public class SqlRuPostParser {
                 if (Objects.isNull(postsListTopic)) {
                     continue;
                 }
-                Post post = new Post(postsListTopic.child(0)
-                                                   .attr("href"));
-                post.setTopicName(postsListTopic.child(0)
-                                                .text());
-                Element author = tr.selectFirst(".altCol");
-                post.setAuthorName(author.child(0)
-                                         .text());
-                post.setAuthorUrl(author.child(0)
-                                        .attr("href"));
+                String url = postsListTopic.child(0)
+                                           .attr("href");
+                Post post = parsePost(url);
+
                 post.setAnswers(Short.parseShort(tr.child(3)
                                                    .text()));
                 post.setViews(Integer.parseInt(tr.child(4)
@@ -51,7 +47,6 @@ public class SqlRuPostParser {
                         tr.select(".altCol")
                           .get(1)
                           .text()));
-                parseTopic(post);
                 posts.add(post);
             }
         } catch (IOException e) {
@@ -61,37 +56,66 @@ public class SqlRuPostParser {
     }
 
     /**
-     * Парсит тему по ссылке на предмет первого сообщения и апдейтит
-     * переданный Post.
-     * Сначала пытаемся всё спарсить, уже потом апдейтим post, чтобы не было
-     * огрызков, если данные некорректны
-     *
-     * По поводу created - сплитуется по [ из-за наполнения msgFooter - вчера,
-     * 11:01    [22158875]
+     * Думаю лучше заполнять post по ходу парсинга, то есть не дожидаться,
+     * когда всё запарсится и потом уже присваивать, а делать это сразу -в
+     * таком случае мы хоть и можем получить "огрозочный" пост, но идейно это
+     * лучше чем просто пустой. Всё равно LOG есть
+     * Каждый пост сопровождается плавующим тегом new и обойти
+     * его можно только извращениями со String, потому что никакими другими
+     * способами отделить text ДО класса newMessage в блоке которого и
+     * содержится new - нереально
      */
-    private static boolean parseTopic(Post post) {
-        boolean result = false;
+    @Override
+    public Post parsePost(String pageUrl) {
+        Post result = new Post(pageUrl);
         try {
-            Document doc = Jsoup.connect(post.getTopicUrl())
+            Document doc = Jsoup.connect(pageUrl)
                                 .get();
-            String description = doc.selectFirst(".msgTable")
-                                    .select(".msgBody")
-                                    .get(1)
-                                    .text();
-            String created = doc.selectFirst(".msgFooter")
-                                .text()
-                                .split("\\[")[0].trim();
-            post.setCreated(SqlRuDateParser.parseDate(created));
-            post.setDescription(description);
-            result = true;
+            Element table = doc.selectFirst(".msgTable");
+            Element messageHeader = table.selectFirst(".messageHeader");
+            Element author = table.select("tr")
+                                  .get(1)
+                                  .selectFirst(".msgBody");
+            result.setDescription(table.select("tr")
+                                       .get(1)
+                                       .select("td")
+                                       .get(1)
+                                       .text());
+            result.setTopicName(eraseTags(messageHeader.text()));
+            result.setAuthorUrl(author.child(0)
+                                      .attr("href"));
+            result.setAuthorName(author.child(0)
+                                       .text());
+            result.setCreated(SqlRuDateParser.parseDate(eraseTags(
+                    table.selectFirst(".msgFooter")
+                         .text())));
+        } catch (IOException e) {
+            LOG.error("Не удалось подключиться в parsePost", e);
         } catch (Exception e) {
-            LOG.error("parseTopic упал", e);
+            LOG.error("Произошло что-то страшное в parsePost", e);
         }
         return result;
     }
 
+    /**
+     * То самое извращение со String, чтобы как-то избавиться от плавающих
+     * тагов [new]
+     *
+     * @param topic тело messageHeader'a
+     *
+     * @return очищенный заголовок темы
+     */
+    private String eraseTags(String topic) {
+        StringBuilder stringBuilder = new StringBuilder(topic);
+        int startBracket;
+        if ((startBracket = stringBuilder.lastIndexOf("[")) != -1) {
+            stringBuilder.delete(startBracket, stringBuilder.length());
+        }
+        return stringBuilder.toString();
+    }
+
     public static void main(String[] args) {
-        parsePost("https://www.sql.ru/forum/job-offers/1").forEach(
-                System.out::println);
+        new SqlRuPostParser().parsePosts("https://www.sql.ru/forum/job-offers")
+                             .forEach(System.out::println);
     }
 }
