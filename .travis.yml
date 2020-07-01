@@ -22,22 +22,23 @@ notifications:
     on_success: never # default: change
     on_failure: always # default: always
 
+    codecov:
+      require_ci_to_pass: yes
+
     coverage:
-      status:
-        project:
-          default:
-            # basic
-            target: 20%
-            threshold: 0%
-            base: auto
-            flags:
-              - unit
-            paths:
-              - "src"
-            # advanced
-            branches:
-              - master
-            if_not_found: success
-            if_ci_failed: error
-            informational: false
-            only_pulls: false
+      precision: 2
+      round: down
+      range: "10...15"
+
+    parsers:
+      gcov:
+        branch_detection:
+          conditional: yes
+          loop: yes
+          method: no
+          macro: no
+
+    comment:
+      layout: "reach,diff,flags,tree"
+      behavior: default
+      require_changes: no
