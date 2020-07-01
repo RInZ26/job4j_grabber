@@ -27,11 +27,7 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
     private Connection connection;
 
     /**
-     * Выбрасывает Exception, потому что простым логгированием тут не обойтись
-     *
-     * @param cfg - кофиг
-     *
-     * @throws Exception если что-то пошло не так в иниициализации Connection
+     * Инициализирует Connection, если может прочитать конфиг
      */
     PsqlStore(Properties cfg) {
         try {
@@ -41,6 +37,9 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
         }
     }
 
+    /**
+     * Попытка прочесть конфиг
+     */
     private void initConnection(Properties cfg) throws Exception {
         Class.forName(cfg.getProperty("jdbc.driver"));
         connection = DriverManager.getConnection(cfg.getProperty("jdbc.url"),
@@ -59,7 +58,7 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
 
     /**
      * Стоит ли вообще тут возвращать заявку, почему бы просто не апдейдить
-     * выданную?
+     * ту, что в параметре? //fixme
      *
      * @param post - сохраняемая запись, возвращающая post с generatedKeys
      *
@@ -82,7 +81,7 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
                     LOG.error("generatedKeys в save упал", e);
                 }
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             LOG.error("save упал {} ", post, e);
         }
     }
@@ -119,7 +118,7 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
                 LOG.error("rs в findById упал", e);
             }
         } catch (Exception e) {
-            LOG.error("findById упал", e);
+            LOG.error("findById упал {}", id, e);
         }
         return post;
     }
