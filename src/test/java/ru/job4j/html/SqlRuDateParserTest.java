@@ -44,7 +44,7 @@ public class SqlRuDateParserTest {
                    is(today.getMonthValue()));
         assertThat(actual.get(1).getMinute(), is(56));
         assertThat(actual.get(1).getDayOfMonth(),
-                   is(today.getDayOfMonth() - 1));
+                   is(today.minusDays(1).getDayOfMonth()));
         assertThat(actual.get(2).getMonthValue(), is(12));
     }
 }
