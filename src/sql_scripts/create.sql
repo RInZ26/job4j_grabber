@@ -1,0 +1,6 @@
+CREATE TABLE post(
+id SERIAL PRIMARY KEY,
+name VARCHAR(150),
+description TEXT,
+link VARCHAR(200) NOT NULL UNIQUE
+);
