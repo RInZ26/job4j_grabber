@@ -7,6 +7,8 @@ import java.util.Objects;
  * Класс - модель данных
  */
 public class Post {
+    /** id из БД */
+    private int id;
     /**
      * Название темы
      */
@@ -16,31 +18,6 @@ public class Post {
      * Юрлька темы - сердце поста
      */
     private final String topicUrl;
-
-    /**
-     * Ник автора темы
-     */
-    private String authorName;
-
-    /**
-     * Юрлька автора
-     */
-    private String authorUrl;
-
-    /**
-     * Количество постов (кроме первого поста автора) в теме
-     */
-    private short answers;
-
-    /**
-     * Количество просмотров темы
-     */
-    private int views;
-
-    /**
-     * Дата последнего поста в теме
-     */
-    private LocalDateTime lastUpdated;
 
     /**
      * Описание вакансии - первый пост
@@ -59,6 +36,18 @@ public class Post {
      */
     public Post(String topicUrl) {
         this.topicUrl = topicUrl;
+    }
+
+    /**
+     * Конструктор из самого главного - того, что хранится в БД
+     */
+    public Post(int id, String topicUrl, String topicName, String description,
+                LocalDateTime created) {
+        this(topicUrl);
+        this.id = id;
+        this.topicName = topicName;
+        this.created = created;
+        this.description = description;
     }
 
     /**
@@ -86,7 +75,16 @@ public class Post {
 
     @Override
     public String toString() {
-        return topicName + " " + topicUrl + " " + description;
+        return id + " " + created + " " + topicName + " " + topicUrl + " "
+                + description;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 
     public String getTopicName() {
@@ -99,46 +97,6 @@ public class Post {
 
     public String getTopicUrl() {
         return topicUrl;
-    }
-
-    public String getAuthorName() {
-        return authorName;
-    }
-
-    public void setAuthorName(String authorName) {
-        this.authorName = authorName;
-    }
-
-    public String getAuthorUrl() {
-        return authorUrl;
-    }
-
-    public void setAuthorUrl(String authorUrl) {
-        this.authorUrl = authorUrl;
-    }
-
-    public short getAnswers() {
-        return answers;
-    }
-
-    public void setAnswers(short answers) {
-        this.answers = answers;
-    }
-
-    public int getViews() {
-        return views;
-    }
-
-    public void setViews(int views) {
-        this.views = views;
-    }
-
-    public LocalDateTime getLastUpdated() {
-        return lastUpdated;
-    }
-
-    public void setLastUpdated(LocalDateTime lastUpdated) {
-        this.lastUpdated = lastUpdated;
     }
 
     public String getDescription() {

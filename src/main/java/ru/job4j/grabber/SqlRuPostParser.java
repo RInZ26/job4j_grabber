@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -90,5 +91,33 @@ public class SqlRuPostParser implements Parse<Post> {
             stringBuilder.delete(startBracket, stringBuilder.length());
         }
         return stringBuilder.toString();
+    }
+
+    /**
+     * Парсит посты с сайта в промежутке start-finish.
+     * Никакие try-catch не нужны, всё уже учтено в используемых методах
+     *
+     * @param start  начало поиска
+     * @param finish конец поиска
+     * @param url    url любой по номеру страницы, которые нужно парсить
+     *
+     * @return объединненая коллекцию
+     */
+    public List<Post> parsePostsBetween(int start, int finish, String url) {
+        if (start < 0 || finish < 0 || finish < start || Objects.isNull(url)) {
+            LOG.warn("Неадекватные входные данные в parsePosts {} - {} - {}",
+                     start, finish, url);
+            return Collections.emptyList();
+        }
+        var result = new ArrayList<Post>();
+        StringBuilder defaultUrl = new StringBuilder(url);
+        for (int c = start; c <= finish; c++) {
+            LOG.debug("Парсируется страница {} ", c);
+            defaultUrl.delete(defaultUrl.lastIndexOf("/") + 1,
+                              defaultUrl.length())
+                      .append(c);
+            result.addAll(parsePosts(defaultUrl.toString()));
+        }
+        return result;
     }
 }

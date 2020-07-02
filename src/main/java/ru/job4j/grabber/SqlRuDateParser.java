@@ -39,7 +39,7 @@ public class SqlRuDateParser {
             put("июн", 6);
             put("июл", 7);
             put("авг", 8);
-            put("сеп", 9);
+            put("сен", 9);
             put("окт", 10);
             put("ноя", 11);
             put("дек", 12);
@@ -154,33 +154,6 @@ public class SqlRuDateParser {
         return rawDate.stream()
                       .map(SqlRuDateParser::parseDate)
                       .collect(Collectors.toList());
-    }
-
-    /**
-     * Парсит данные с сайта в промежутке start-finish.
-     * Никакие try-catch не нужны, всё уже учтено в используемых методах
-     *
-     * @param start  начало поиска
-     * @param finish конец поиска
-     * @param url    url любой по номеру страницы, которые нужно парсить
-     *
-     * @return объединненая коллекцию
-     */
-    public static List<LocalDateTime> parseDatesBetween(int start, int finish,
-                                                        String url) {
-        if (start < 0 || finish < 0 || finish < start || Objects.isNull(url)) {
-            LOG.warn("Неадекватные входные данные в parseDatesBetween");
-            return Collections.emptyList();
-        }
-        var result = new ArrayList<LocalDateTime>();
-        StringBuilder defaultUrl = new StringBuilder(url);
-        for (int c = start; c <= finish; c++) {
-            defaultUrl.delete(defaultUrl.lastIndexOf("/") + 1,
-                              defaultUrl.length())
-                      .append(c);
-            result.addAll(parseDates(getRawDatesFrom(defaultUrl.toString())));
-        }
-        return result;
     }
 
     /**
