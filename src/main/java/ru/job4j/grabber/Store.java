@@ -12,21 +12,16 @@ public interface Store<T> {
      * "on conflict do nothing"
      *
      * @param post - сохраняемая запись, возвращающая post с generatedKeys
-     *
-     * @return лучше boolean чем войд, так хоть можно проверить через 0 <
-     * executeUpdate, что пост сохранился
      */
-    boolean save(T post);
+    void save(T post);
 
     /**
      * Более удобная версия save, чтобы повысить производетельность работы, в
      * сравнении с миллионом вызовыов одноразового save
      *
      * @param posts - что заносим
-     *
-     * @return добавилось/не добавилось
      */
-    boolean saveAll(List<T> posts);
+    void saveAll(List<T> posts);
 
     /**
      * Выгрузка всех постов из БД

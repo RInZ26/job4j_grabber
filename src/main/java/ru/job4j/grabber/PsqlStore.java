@@ -6,20 +6,17 @@ import org.slf4j.LoggerFactory;
 import java.io.InputStream;
 import java.sql.*;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.function.Consumer;
-
-//FIXME Подлый Serial увеличивает id и при провале добавления. Нужно это
-// как-то обойти
+// FIXME Подлый Serial ломает структуру id'шников, при добавлени дублей
+//  (инкрементация происходит, хотя insert не срабатывает)
 public class PsqlStore implements Store<Post>, AutoCloseable {
     private static final String SELECT_ALL_QUERY = "SELECT * FROM post;";
     private static final String FIND_BY_ID_QUERY = "SELECT * FROM post WHERE post.id = ?;";
     private static final String INSERT_QUERY = "INSERT INTO post(link, name, "
-            + "description, created) VALUES(?, ? , ?, ?) ON conflict do "
+            + "description, created) VALUES(?, ? , ?, ?) on conflict do "
             + "nothing;";
 
     /**
@@ -78,45 +75,56 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
         }
     }
 
-    /**
-     * Читай интерфейс
-     */
     @Override
-    public boolean save(Post post) {
-        boolean result = false;
+    public void save(Post post) {
         try (PreparedStatement statement = connection.prepareStatement(
                 INSERT_QUERY, Statement.RETURN_GENERATED_KEYS)) {
             fillState(statement, post.getTopicUrl(), post.getTopicName(),
-                      post.getDescription(), post.getCreated());
-            result = 0 < statement.executeUpdate();
+                      post.getDescription(), post.getCreated(), 0);
+            statement.execute();
         } catch (SQLException e) {
             LOG.error("fillState упал {}", post, e);
         } catch (Exception e) {
             LOG.error("save упал {} ", post, e);
         }
-        return result;
     }
 
+    /**
+     * Идея -  выполнить добавление всех заявок посредством только лишь одного
+     * execute. Для этого в начале делаем составной запрос из дефолтного Insert
+     * Разницы между такой полной записью - или если пытаться дробить запрос
+     * и соединять кусочкам -  то есть вместо Insert values()... insert values
+     * ...n делать insert values ()...()...n - НЕТ НИКАКОГО СМЫСЛА. По скорости
+     * тоже самое.
+     *
+     * Из плюсов - супер выигрыш в скорости, в сравнении с мульти вызовом
+     * save(Post)
+     *
+     * Из минусов - собственно т.к. это
+     * одна транзакция, либо всё
+     * сохранится - либо ничего.
+     *
+     * @param posts - что заносим
+     */
     @Override
-    public boolean saveAll(List<Post> posts) {
-        int countOfSaved = 0;
-        try (PreparedStatement statement = connection.prepareStatement(
-                INSERT_QUERY)) {
-            for (Post post : posts) {
-                try { //чтобы fore не прекращался  - отдельный try
-                    fillState(statement, post.getTopicUrl(),
-                              post.getTopicName(), post.getDescription(),
-                              post.getCreated());
-                    countOfSaved += statement.executeUpdate();
-                } catch (SQLException e) {
-                    LOG.error("fillState упал {}", post, e);
-                }
-            }
-        } catch (Exception e) {
-            LOG.error("saveAll упал, было сохранено {} записей ", countOfSaved,
-                      e);
+    public void saveAll(List<Post> posts) {
+        StringBuilder superQuery = new StringBuilder();
+        for (int i = 0; i < posts.size(); i++) {
+            superQuery.append(INSERT_QUERY);
         }
-        return countOfSaved == posts.size();
+        try (PreparedStatement statement = connection.prepareStatement(
+                superQuery.toString())) {
+            int paramIndex = 0;
+            for (Post post : posts) {
+                paramIndex = fillState(statement, post.getTopicUrl(),
+                                       post.getTopicName(),
+                                       post.getDescription(), post.getCreated(),
+                                       paramIndex);
+            }
+            statement.execute();
+        } catch (Exception e) {
+            LOG.error("saveAll упал ", e);
+        }
     }
 
     /**
@@ -124,13 +132,14 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
      * так и много, чтобы оборачивать это в varargs с черной магией и
      * диспатчером
      */
-    private void fillState(PreparedStatement statement, String url, String name,
-                           String description, LocalDateTime created)
-            throws SQLException {
-        statement.setString(1, url);
-        statement.setString(2, name);
-        statement.setString(3, description);
-        statement.setTimestamp(4, Timestamp.valueOf(created));
+    private int fillState(PreparedStatement statement, String url, String name,
+                          String description, LocalDateTime created,
+                          int startParamIndex) throws SQLException {
+        statement.setString(++startParamIndex, url);
+        statement.setString(++startParamIndex, name);
+        statement.setString(++startParamIndex, description);
+        statement.setTimestamp(++startParamIndex, Timestamp.valueOf(created));
+        return startParamIndex;
     }
 
     @Override
@@ -180,54 +189,15 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
                           .toLocalDateTime());
     }
 
-   /* static Consumer<List<Post>> saver = (posts) -> {
-        try (var psqlStore = new PsqlStore(getDefaultCfg())) {
-            posts.forEach(psqlStore::save);
-        } catch (Exception e) {
-            LOG.error("main fell down", e); //3254283900   100 pages
-        }
-    };
-
-    static Consumer<List<Post>> allSaver = (posts) -> {
-        try (var psqlStore = new PsqlStore(getDefaultCfg())) {
-            psqlStore.saveAll(posts);
-        } catch (Exception e) {
-            LOG.error("main fell down", e); //2186217900   100 pages
-        }
-    };
-
     public static void main(String[] args) {
-        var sqlParser = new SqlRuPostParser();
-        List<Post> posts = sqlParser.parsePostsBetween(1, 10, "https://www"
-                + ".sql.ru/forum/job-offers/2");
-        analyze(saver, posts);
-        analyze(allSaver, posts);
-    }
-
-    static void analyze(Consumer f, List<Post> posts) {
-        rebase();
-        LocalTime start, finish;
-        start = LocalTime.now();
-        f.accept(posts);
-        finish = LocalTime.now();
-        System.out.println(
-                "diff  secs " + (finish.getSecond() - start.getSecond()));
-        System.out.println(
-                "diff nanosecs  " + (finish.toNanoOfDay() - start.toNanoOfDay()));
-    }
-
-    static void rebase() {
         try (var sqlStore = new PsqlStore(getDefaultCfg())) {
-            try (PreparedStatement st = sqlStore.connection.prepareStatement(
-                    "DROP TABLE IF EXISTS post;\n" + "CREATE TABLE post(\n"
-                            + "id SERIAL PRIMARY KEY,\n"
-                            + "link VARCHAR(200) NOT NULL UNIQUE,\n"
-                            + "name VARCHAR(150),\n" + "description TEXT,\n"
-                            + "created TIMESTAMP\n" + ");")) {
-                st.execute();
-            }
+            var sqlParser = new SqlRuPostParser();
+            sqlStore.saveAll(sqlParser.parsePostsBetween(1, 3,
+                                                         "https://www.sql.ru/forum/job-offers/"));
+            sqlStore.getAll()
+                    .forEach(System.out::println);
         } catch (Exception e) {
-            LOG.error("gg", e);
+            LOG.error("main fell down", e);
         }
-    }*/
+    }
 }

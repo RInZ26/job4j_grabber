@@ -97,9 +97,10 @@ public class SqlRuPostParser implements Parse<Post> {
      * Парсит посты с сайта в промежутке start-finish.
      * Никакие try-catch не нужны, всё уже учтено в используемых методах
      *
-     * @param start  начало поиска
-     * @param finish конец поиска
-     * @param url    url любой по номеру страницы, которые нужно парсить
+     * @param start  начало поиска inclusive
+     * @param finish конец поиска inclusive
+     * @param url    url любой по номеру страницы(она всё равно обрубится),
+     *               которые нужно парсить
      *
      * @return объединненая коллекцию
      */
