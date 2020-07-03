@@ -6,14 +6,14 @@ import java.util.List;
  * Интерфейс - связь с БД
  * T - класс модели данных
  */
-public interface Store<T> {
+public interface Store {
     /**
      * Сохранение. Запросам, выполняющим этот метод и saveAll лучше дружить с
      * "on conflict do nothing"
      *
      * @param post - сохраняемая запись, возвращающая post с generatedKeys
      */
-    void save(T post);
+    void save(Post post);
 
     /**
      * Более удобная версия save, чтобы повысить производетельность работы, в
@@ -21,12 +21,12 @@ public interface Store<T> {
      *
      * @param posts - что заносим
      */
-    void saveAll(List<T> posts);
+    void saveAll(List<Post> posts);
 
     /**
      * Выгрузка всех постов из БД
      */
-    List<T> getAll();
+    List<Post> getAll();
 
     /**
      * Поиск поста по id
@@ -37,5 +37,5 @@ public interface Store<T> {
      *
      * @return добавилось/не добавилось
      */
-    T findById(String id);
+    Post findById(String id);
 }

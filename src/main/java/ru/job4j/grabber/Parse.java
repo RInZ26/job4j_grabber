@@ -5,14 +5,23 @@ import java.util.List;
 /**
  * Интерфейс парсинга постов с сайта
  */
-public interface Parse<T> {
+public interface Parse {
     /**
      * Загружает список всех постов
      */
-    List<T> parsePosts(String url);
+    List<Post> parsePosts(String url);
 
     /**
      * Загружает детали одного поста
      */
-    T parsePost(String url);
+    Post parsePost(String url);
+
+    /**
+     * Расширенная версия parePosts, позволяющая парсить диапазон страниц
+     * @param start inclusive начало
+     * @param finish inclusive конец
+     * @param url юрлька, которая обрубается до последнего \
+     * @return объединенная коллекция
+     */
+    List<Post> parsePostsBetween(int start, int finish, String url);
 }

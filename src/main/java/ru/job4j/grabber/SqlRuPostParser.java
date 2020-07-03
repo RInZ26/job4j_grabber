@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-public class SqlRuPostParser implements Parse<Post> {
+public class SqlRuPostParser implements Parse {
     /**
      * logger
      */
@@ -96,6 +96,8 @@ public class SqlRuPostParser implements Parse<Post> {
     /**
      * Парсит посты с сайта в промежутке start-finish.
      * Никакие try-catch не нужны, всё уже учтено в используемых методах
+     * url ДОЛЖНА заканчиваться либо на номера страниц, либо на /
+     * иначе метод упадёт
      *
      * @param start  начало поиска inclusive
      * @param finish конец поиска inclusive
@@ -104,6 +106,7 @@ public class SqlRuPostParser implements Parse<Post> {
      *
      * @return объединненая коллекцию
      */
+    @Override
     public List<Post> parsePostsBetween(int start, int finish, String url) {
         if (start < 0 || finish < 0 || finish < start || Objects.isNull(url)) {
             LOG.warn("Неадекватные входные данные в parsePosts {} - {} - {}",

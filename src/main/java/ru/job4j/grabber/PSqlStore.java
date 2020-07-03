@@ -10,9 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
+
 // FIXME Подлый Serial ломает структуру id'шников, при добавлени дублей
 //  (инкрементация происходит, хотя insert не срабатывает)
-public class PsqlStore implements Store<Post>, AutoCloseable {
+public class PSqlStore implements Store, AutoCloseable {
     private static final String SELECT_ALL_QUERY = "SELECT * FROM post;";
     private static final String FIND_BY_ID_QUERY = "SELECT * FROM post WHERE post.id = ?;";
     private static final String INSERT_QUERY = "INSERT INTO post(link, name, "
@@ -23,7 +24,7 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
      * Логгер
      */
     private static final Logger LOG = LoggerFactory.getLogger(
-            PsqlStore.class.getName());
+            PSqlStore.class.getName());
     /**
      * Коннекшен к БД
      */
@@ -32,7 +33,7 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
     /**
      * Инициализирует Connection, если может прочитать конфиг
      */
-    PsqlStore(Properties cfg) {
+    PSqlStore(Properties cfg) {
         try {
             initConnection(cfg);
         } catch (Exception e) {
@@ -43,9 +44,9 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
     /**
      * Загружает дефолтный cfg из resources
      */
-    private static Properties getDefaultCfg() {
+    public static Properties getDefaultCfg() {
         Properties conf = null;
-        try (InputStream in = PsqlStore.class.getClassLoader()
+        try (InputStream in = PSqlStore.class.getClassLoader()
                                              .getResourceAsStream(
                                                      "postgre.properties")) {
             conf = new Properties();
@@ -190,7 +191,7 @@ public class PsqlStore implements Store<Post>, AutoCloseable {
     }
 
     public static void main(String[] args) {
-        try (var sqlStore = new PsqlStore(getDefaultCfg())) {
+        try (var sqlStore = new PSqlStore(getDefaultCfg())) {
             var sqlParser = new SqlRuPostParser();
             sqlStore.saveAll(sqlParser.parsePostsBetween(1, 3,
                                                          "https://www.sql.ru/forum/job-offers/"));
