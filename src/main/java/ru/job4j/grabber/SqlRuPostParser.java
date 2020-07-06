@@ -17,6 +17,22 @@ public class SqlRuPostParser implements Parse {
      */
     private static final Logger LOG = LoggerFactory.getLogger(
             SqlRuPostParser.class.getName());
+    /**
+     * url, которые мы будем парсить - они могут быть, могут и не быть заявлены
+     */
+    private String[] urls;
+
+    public SqlRuPostParser() {
+    }
+
+    public SqlRuPostParser(String... urls) {
+        this.urls = urls;
+    }
+
+    @Override
+    public String[] getUrls() {
+        return urls;
+    }
 
     /**
      * @param pageUrl - юрл с таблицей тем, например https://www.sql.ru/forum/job-offers/1

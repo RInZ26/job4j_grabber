@@ -24,4 +24,8 @@ public interface Parse {
      * @return объединенная коллекция
      */
     List<Post> parsePostsBetween(int start, int finish, String url);
+
+    /** Возвращает список url, котоыре нужно парсить
+     */
+    String[] getUrls();
 }

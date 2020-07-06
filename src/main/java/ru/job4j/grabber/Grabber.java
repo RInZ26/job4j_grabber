@@ -11,10 +11,7 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -42,14 +39,14 @@ public class Grabber implements Grab {
     public static void main(String[] args) throws Exception {
         var grabber = new Grabber(getDefaultCfg());
         Store store = new PSqlStore(PSqlStore.getDefaultCfg());
-        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(),
-                     "https://www.sql.ru/forum/job-offers/1");
-        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(),
-                     "https://www.sql.ru/forum/job-offers/2");
-        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(),
-                     "https://www.sql.ru/forum/job-offers/3");
-        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(),
-                     "https://www.sql.ru/forum/job-offers/4");
+        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(
+                "https://www.sql.ru/forum/job-offers/1",
+                "https://www.sql.ru/forum/job-offers/2"));
+        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(
+                "https://www.sql.ru/forum/job-offers/3"));
+        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(
+                "https://www.sql.ru/forum/job-offers/4"));
+        grabber.init(store, grabber.scheduler(), new SqlRuPostParser());
         grabber.web(grabber.getStore());
     }
 
@@ -74,13 +71,12 @@ public class Grabber implements Grab {
     }
 
     @Override
-    public void init(Store store, Scheduler scheduler, Parse parse,
-                     String... urls) throws SchedulerException {
+    public void init(Store store, Scheduler scheduler, Parse parse)
+            throws SchedulerException {
         JobDataMap data = new JobDataMap();
         this.store = store;
         data.put("store", store);
         data.put("parse", parse);
-        data.put("urls", urls);
         JobDetail job = newJob(GrabJob.class).usingJobData(data)
                                              .build();
         SimpleScheduleBuilder times = simpleSchedule().withIntervalInSeconds(
@@ -115,21 +111,26 @@ public class Grabber implements Grab {
                                                        .getJobDataMap();
             Parse parse = (Parse) jobDataMap.get("parse");
             Store store = (Store) jobDataMap.get("store");
-            String[] urls = (String[]) jobDataMap.get("urls");
-            List<Post> posts = new ArrayList<>();
-            for (String url : urls) {
-                posts.addAll(parse.parsePosts(url));
+            if (!Objects.isNull(parse.getUrls())) {
+                List<Post> posts = new ArrayList<>();
+                for (String url : parse.getUrls()) {
+                    posts.addAll(parse.parsePosts(url));
+                }
+                store.saveAll(posts.stream()
+                                   .filter(isJava)
+                                   .collect(Collectors.toList()));
+                LOG.debug("Job with urls {} was finished ",
+                          Arrays.toString(parse.getUrls()));
+            } else {
+                LOG.debug("Urls which should be parsed not found");
             }
-            store.saveAll(posts.stream()
-                               .filter(isJava)
-                               .collect(Collectors.toList()));
-            LOG.debug("Job with urls {} was finished ", Arrays.toString(urls));
         }
     }
 
     /**
-     *Вывод store на localhost
+     * Вывод store на localhost
      * cp866 - кодировка, чтобы победить рутекст
+     *
      * @param store
      */
     public void web(Store store) {
