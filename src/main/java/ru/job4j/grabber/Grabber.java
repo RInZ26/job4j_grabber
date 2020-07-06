@@ -12,6 +12,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.function.Predicate;
@@ -38,6 +39,20 @@ public class Grabber implements Grab {
         this.cfg = cfg;
     }
 
+    public static void main(String[] args) throws Exception {
+        var grabber = new Grabber(getDefaultCfg());
+        Store store = new PSqlStore(PSqlStore.getDefaultCfg());
+        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(),
+                     "https://www.sql.ru/forum/job-offers/1");
+        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(),
+                     "https://www.sql.ru/forum/job-offers/2");
+        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(),
+                     "https://www.sql.ru/forum/job-offers/3");
+        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(),
+                     "https://www.sql.ru/forum/job-offers/4");
+        grabber.web(grabber.getStore());
+    }
+
     public static Properties getDefaultCfg() throws IOException {
         Properties cfg = new Properties();
         try (InputStream in = Grabber.class.getClassLoader()
@@ -54,13 +69,18 @@ public class Grabber implements Grab {
         return scheduler;
     }
 
+    public Store getStore() {
+        return store;
+    }
+
     @Override
-    public void init(Store store, Scheduler scheduler, Holder... holders)
-            throws SchedulerException {
+    public void init(Store store, Scheduler scheduler, Parse parse,
+                     String... urls) throws SchedulerException {
         JobDataMap data = new JobDataMap();
         this.store = store;
         data.put("store", store);
-        data.put("holders", holders);
+        data.put("parse", parse);
+        data.put("urls", urls);
         JobDetail job = newJob(GrabJob.class).usingJobData(data)
                                              .build();
         SimpleScheduleBuilder times = simpleSchedule().withIntervalInSeconds(
@@ -91,46 +111,20 @@ public class Grabber implements Grab {
         @Override
         public void execute(JobExecutionContext jobExecutionContext)
                 throws JobExecutionException {
-
             JobDataMap jobDataMap = jobExecutionContext.getJobDetail()
                                                        .getJobDataMap();
-            Holder[] holders = (Holder[]) jobDataMap.get("holders");
+            Parse parse = (Parse) jobDataMap.get("parse");
             Store store = (Store) jobDataMap.get("store");
+            String[] urls = (String[]) jobDataMap.get("urls");
             List<Post> posts = new ArrayList<>();
-            for (Holder holder : holders) {
-                for (String url : holder.getUrls()) {
-                    posts.addAll(holder.getParser()
-                                       .parsePosts(url)
-                                       .stream()
-                                       .filter(isJava)
-                                       .collect(Collectors.toList()));
-                }
+            for (String url : urls) {
+                posts.addAll(parse.parsePosts(url));
             }
-            store.saveAll(posts);
+            store.saveAll(posts.stream()
+                               .filter(isJava)
+                               .collect(Collectors.toList()));
+            LOG.debug("Job with urls {} was finished ", Arrays.toString(urls));
         }
-    }
-
-    public Store getStore() {
-        return store;
-    }
-
-    public static void main(String[] args) throws Exception {
-        Grabber grab = new Grabber(Grabber.getDefaultCfg());
-        Store store = new PSqlStore(PSqlStore.getDefaultCfg());
-        Scheduler scheduler = grab.scheduler();
-        grab.init(store, scheduler, new Holder(new SqlRuPostParser(),
-                                               "https://www.sql" + ".ru"
-                                                               + "/forum"
-                                                               + "/job"
-                                                               + "-offers/1",
-                                               "https://www.sql" + ".ru"
-                                                               + "/forum"
-                                                               + "/job"
-                                                               + "-offers"
-                                                               + "/2"),
-                  new Holder(new SqlRuPostParser(),
-                             "https://www.sql.ru/forum/job/1"));
-        grab.web(grab.store);
     }
 
     public void web(Store store) {
@@ -159,5 +153,3 @@ public class Grabber implements Grab {
         }).start();
     }
 }
-
-
