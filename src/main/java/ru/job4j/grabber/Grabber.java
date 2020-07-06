@@ -127,29 +127,31 @@ public class Grabber implements Grab {
         }
     }
 
+    /**
+     *Вывод store на localhost
+     * cp866 - кодировка, чтобы победить рутекст
+     * @param store
+     */
     public void web(Store store) {
-        new Thread(() -> {
-            System.out.println("Hello?");
-            try (ServerSocket server = new ServerSocket(
-                    Integer.parseInt(cfg.getProperty("port")))) {
-                while (!server.isClosed()) {
-                    Socket socket = server.accept();
-                    try (var out = new PrintWriter(socket.getOutputStream(),
-                                                   true,
-                                                   Charset.forName("cp866"))) {
-                        out.print("HTTP/1.1 200 OK\r\n\r\n");
-                        for (Post post : store.getAll()) {
-                            out.print(post.toString());
-                            out.print(System.lineSeparator());
-                            out.print(System.lineSeparator());
-                        }
-                    } catch (IOException io) {
-                        io.printStackTrace();
+        LOG.debug("web was started");
+        try (ServerSocket server = new ServerSocket(
+                Integer.parseInt(cfg.getProperty("port")))) {
+            while (!server.isClosed()) {
+                Socket socket = server.accept();
+                try (var out = new PrintWriter(socket.getOutputStream(), true,
+                                               Charset.forName("cp866"))) {
+                    out.print("HTTP/1.1 200 OK\r\n\r\n");
+                    for (Post post : store.getAll()) {
+                        out.print(post.toString());
+                        out.print(System.lineSeparator());
+                        out.print(System.lineSeparator());
                     }
+                } catch (IOException io) {
+                    io.printStackTrace();
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
-        }).start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
