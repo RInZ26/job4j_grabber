@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 
-// FIXME Подлый Serial ломает структуру id'шников, при добавлени дублей
+//  Подлый Serial ломает структуру id'шников, при добавлени дублей
 //  (инкрементация происходит, хотя insert не срабатывает)
 public class PSqlStore implements Store, AutoCloseable {
     private static final String SELECT_ALL_QUERY = "SELECT * FROM post;";
@@ -81,7 +81,7 @@ public class PSqlStore implements Store, AutoCloseable {
         try (PreparedStatement statement = connection.prepareStatement(
                 INSERT_QUERY, Statement.RETURN_GENERATED_KEYS)) {
             fillState(statement, post.getTopicUrl(), post.getTopicName(),
-                      post.getDescription(), post.getCreated(), 0);
+                      post.getDescription(), post.getCreated());
             statement.execute();
         } catch (SQLException e) {
             LOG.error("fillState упал {}", post, e);
@@ -91,40 +91,36 @@ public class PSqlStore implements Store, AutoCloseable {
     }
 
     /**
-     * Идея -  выполнить добавление всех заявок посредством только лишь одного
-     * execute. Для этого в начале делаем составной запрос из дефолтного Insert
-     * Разницы между такой полной записью - или если пытаться дробить запрос
-     * и соединять кусочкам -  то есть вместо Insert values()... insert values
-     * ...n делать insert values ()...()...n - НЕТ НИКАКОГО СМЫСЛА. По скорости
-     * тоже самое.
-     *
-     * Из плюсов - супер выигрыш в скорости, в сравнении с мульти вызовом
-     * save(Post)
-     *
-     * Из минусов - собственно т.к. это
-     * одна транзакция, либо всё
-     * сохранится - либо ничего.
-     *
+     * Сохранение заявок через механизм batch-команд, когда мы заранее
+     * оформляет пачку запросов, потом её коммитим через одну команду
      * @param posts - что заносим
      */
     @Override
     public void saveAll(List<Post> posts) {
-        StringBuilder superQuery = new StringBuilder();
-        for (int i = 0; i < posts.size(); i++) {
-            superQuery.append(INSERT_QUERY);
-        }
-        try (PreparedStatement statement = connection.prepareStatement(
-                superQuery.toString())) {
-            int paramIndex = 0;
-            for (Post post : posts) {
-                paramIndex = fillState(statement, post.getTopicUrl(),
-                                       post.getTopicName(),
-                                       post.getDescription(), post.getCreated(),
-                                       paramIndex);
+        try {
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    INSERT_QUERY)) {
+                for (Post post : posts) {
+                    fillState(statement, post.getTopicUrl(),
+                              post.getTopicName(), post.getDescription(),
+                              post.getCreated());
+                    statement.addBatch();
+                }
+                statement.executeBatch();
+                connection.commit();
+            } catch (SQLException e) {
+                LOG.error("Не удалось выполнить работу с Batch)",
+                          e);
             }
-            statement.execute();
         } catch (Exception e) {
             LOG.error("saveAll упал ", e);
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (Exception e) {
+                LOG.error("Не удалось вернуть autoCommit в true", e);
+            }
         }
     }
 
@@ -133,14 +129,13 @@ public class PSqlStore implements Store, AutoCloseable {
      * так и много, чтобы оборачивать это в varargs с черной магией и
      * диспатчером
      */
-    private int fillState(PreparedStatement statement, String url, String name,
-                          String description, LocalDateTime created,
-                          int startParamIndex) throws SQLException {
-        statement.setString(++startParamIndex, url);
-        statement.setString(++startParamIndex, name);
-        statement.setString(++startParamIndex, description);
-        statement.setTimestamp(++startParamIndex, Timestamp.valueOf(created));
-        return startParamIndex;
+    private void fillState(PreparedStatement statement, String url, String name,
+                           String description, LocalDateTime created)
+            throws SQLException {
+        statement.setString(1, url);
+        statement.setString(2, name);
+        statement.setString(3, description);
+        statement.setTimestamp(4, Timestamp.valueOf(created));
     }
 
     @Override
