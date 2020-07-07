@@ -7,10 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintWriter;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.nio.charset.Charset;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -38,16 +34,18 @@ public class Grabber implements Grab {
 
     public static void main(String[] args) throws Exception {
         var grabber = new Grabber(getDefaultCfg());
-        Store store = new PSqlStore(PSqlStore.getDefaultCfg());
-        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(
-                "https://www.sql.ru/forum/job-offers/1",
-                "https://www.sql.ru/forum/job-offers/2"));
-        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(
-                "https://www.sql.ru/forum/job-offers/3"));
-        grabber.init(store, grabber.scheduler(), new SqlRuPostParser(
-                "https://www.sql.ru/forum/job-offers/4"));
-        grabber.init(store, grabber.scheduler(), new SqlRuPostParser());
-        grabber.web(grabber.getStore());
+        Scheduler currentScheduler = grabber.scheduler();
+        try (PSqlStore store = new PSqlStore(PSqlStore.getDefaultCfg())) {
+            grabber.init(store, currentScheduler, new SqlRuPostParser(
+                    "https://www.sql.ru/forum/job-offers/1"));
+            grabber.init(store, currentScheduler, new SqlRuPostParser(
+                    "https://www.sql.ru/forum/job-offers/2"));
+            grabber.init(store, currentScheduler, new SqlRuPostParser(
+                    "https://www.sql.ru/forum/job-offers/3"));
+            Thread.sleep(30000);
+            currentScheduler.shutdown();
+            grabber.web(grabber.getStore());
+        }
     }
 
     public static Properties getDefaultCfg() throws IOException {
@@ -66,6 +64,7 @@ public class Grabber implements Grab {
         return scheduler;
     }
 
+    @Override
     public Store getStore() {
         return store;
     }
@@ -128,31 +127,19 @@ public class Grabber implements Grab {
     }
 
     /**
-     * Вывод store на localhost
+     * Вывод store на localhost, но уже посредством создания HttpServer
      * cp866 - кодировка, чтобы победить рутекст
-     *
-     * @param store
      */
     public void web(Store store) {
-        LOG.debug("web was started");
-        try (ServerSocket server = new ServerSocket(
-                Integer.parseInt(cfg.getProperty("port")))) {
-            while (!server.isClosed()) {
-                Socket socket = server.accept();
-                try (var out = new PrintWriter(socket.getOutputStream(), true,
-                                               Charset.forName("cp866"))) {
-                    out.print("HTTP/1.1 200 OK\r\n\r\n");
-                    for (Post post : store.getAll()) {
-                        out.print(post.toString());
-                        out.print(System.lineSeparator());
-                        out.print(System.lineSeparator());
-                    }
-                } catch (IOException io) {
-                    io.printStackTrace();
-                }
+            try {
+                int port = Integer.parseInt(cfg.getProperty("port"));
+                HttpPostsServer server = new HttpPostsServer(port,
+                                                             store.getAll());
+                LOG.debug("webServer was started http://localhost:{}/posts",
+                          port);
+                server.startServer();
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-    }
 }

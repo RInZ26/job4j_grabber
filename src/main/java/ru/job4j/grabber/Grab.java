@@ -9,4 +9,6 @@ import org.quartz.SchedulerException;
 public interface Grab {
     void init(Store store, Scheduler scheduler, Parse parse)
             throws SchedulerException;
+
+    Store getStore();
 }
