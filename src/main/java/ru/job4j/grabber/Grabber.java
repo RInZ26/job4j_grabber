@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
+import java.util.Properties;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -36,13 +36,11 @@ public class Grabber implements Grab {
         var grabber = new Grabber(getDefaultCfg());
         Scheduler currentScheduler = grabber.scheduler();
         try (PSqlStore store = new PSqlStore(PSqlStore.getDefaultCfg())) {
-            grabber.init(store, currentScheduler, new SqlRuPostParser(
-                    "https://www.sql.ru/forum/job-offers/1"));
-            grabber.init(store, currentScheduler, new SqlRuPostParser(
-                    "https://www.sql.ru/forum/job-offers/2"));
-            grabber.init(store, currentScheduler, new SqlRuPostParser(
-                    "https://www.sql.ru/forum/job-offers/3"));
+            grabber.init(store, currentScheduler, new SqlRuPostParser());
+            grabber.init(store, currentScheduler, new SqlRuPostParser(2, 3));
+            grabber.init(store, currentScheduler, new SqlRuPostParser(4, 4));
             Thread.sleep(30000);
+            currentScheduler.pauseAll();
             currentScheduler.shutdown();
             grabber.web(grabber.getStore());
         }
@@ -100,9 +98,6 @@ public class Grabber implements Grab {
                         post.getDescription())
                                                            .find());
 
-        /**
-         * Сохранение в рамках одной транзакции, для этого и posts
-         */
         @Override
         public void execute(JobExecutionContext jobExecutionContext)
                 throws JobExecutionException {
@@ -110,20 +105,16 @@ public class Grabber implements Grab {
                                                        .getJobDataMap();
             Parse parse = (Parse) jobDataMap.get("parse");
             Store store = (Store) jobDataMap.get("store");
-            if (!Objects.isNull(parse.getUrls())) {
-                List<Post> posts = new ArrayList<>();
-                for (String url : parse.getUrls()) {
-                    posts.addAll(parse.parsePosts(url));
-                }
-                store.saveAll(posts.stream()
-                                   .filter(isJava)
-                                   .collect(Collectors.toList()));
-                LOG.debug("Job with urls {} was finished ",
-                          Arrays.toString(parse.getUrls()));
-            } else {
-                LOG.debug("Urls which should be parsed not found");
-            }
+            store.saveAll(
+                    parse.parsePostsBetween(parse.getStart(), parse.getFinish(),
+                                            parse.getMainUrl())
+                         .stream()
+                         .filter(isJava)
+                         .collect(Collectors.toList()));
+            LOG.debug("Job with pages {} {} and Url was finished ",
+                      parse.getStart(), parse.getFinish(), parse.getMainUrl());
         }
+
     }
 
     /**
@@ -131,15 +122,13 @@ public class Grabber implements Grab {
      * cp866 - кодировка, чтобы победить рутекст
      */
     public void web(Store store) {
-            try {
-                int port = Integer.parseInt(cfg.getProperty("port"));
-                HttpPostsServer server = new HttpPostsServer(port,
-                                                             store.getAll());
-                LOG.debug("webServer was started http://localhost:{}/posts",
-                          port);
-                server.startServer();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        try {
+            int port = Integer.parseInt(cfg.getProperty("port"));
+            HttpPostsServer server = new HttpPostsServer(port, store.getAll());
+            LOG.debug("webServer was started http://localhost:{}/posts", port);
+            server.startServer();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+    }
 }

@@ -6,6 +6,7 @@ import java.util.List;
  * Интерфейс парсинга постов с сайта
  */
 public interface Parse {
+    int A = 3;
     /**
      * Загружает список всех постов
      */
@@ -25,7 +26,18 @@ public interface Parse {
      */
     List<Post> parsePostsBetween(int start, int finish, String url);
 
-    /** Возвращает список url, котоыре нужно парсить
+    /** Возвращает список основной url, которую может парсить парсер, ведь мы
+     *  исходим из того, что каждый парсер заточен под что-то одно
      */
-    String[] getUrls();
+    String getMainUrl();
+
+    /**
+    Номер начальной страницы парсинга
+     */
+    int getStart();
+
+    /**
+     Номер конечной страницы парсинга
+     */
+    int getFinish();
 }

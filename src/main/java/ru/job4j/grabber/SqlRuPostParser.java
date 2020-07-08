@@ -12,26 +12,52 @@ import java.util.List;
 import java.util.Objects;
 
 public class SqlRuPostParser implements Parse {
+
     /**
      * logger
      */
     private static final Logger LOG = LoggerFactory.getLogger(
             SqlRuPostParser.class.getName());
     /**
-     * url, которые мы будем парсить - они могут быть, могут и не быть заявлены
+     * Основная url, которую парсер умеет парсить
      */
-    private String[] urls;
+    private static final String MAIN_URL = "https://www.sql"
+            + ".ru/forum/job-offers/";
+    /**
+     * Начало-конец парсинга
+     */
+    private int startPage;
+    private int finishPage;
 
+    /**
+     * Т.к. странцы нам всё равно идейно нужны, пусть всегда будет первая
+     * страница
+     */
     public SqlRuPostParser() {
+        this(1, 1);
     }
 
-    public SqlRuPostParser(String... urls) {
-        this.urls = urls;
+    /**
+     * Конструктор для реализации работы интерфейса
+     */
+    public SqlRuPostParser(int startPage, int finishPage) {
+        this.startPage = startPage;
+        this.finishPage = finishPage;
     }
 
     @Override
-    public String[] getUrls() {
-        return urls;
+    public int getStart() {
+        return startPage;
+    }
+
+    @Override
+    public int getFinish() {
+        return finishPage;
+    }
+
+    @Override
+    public String getMainUrl() {
+        return MAIN_URL;
     }
 
     /**
