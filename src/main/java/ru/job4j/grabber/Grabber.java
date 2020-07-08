@@ -1,5 +1,6 @@
 package ru.job4j.grabber;
 
+import com.sun.net.httpserver.HttpServer;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
@@ -7,7 +8,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
 import java.util.Properties;
+import java.util.StringJoiner;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -30,20 +33,6 @@ public class Grabber implements Grab {
 
     public Grabber(Properties cfg) {
         this.cfg = cfg;
-    }
-
-    public static void main(String[] args) throws Exception {
-        var grabber = new Grabber(getDefaultCfg());
-        Scheduler currentScheduler = grabber.scheduler();
-        try (PSqlStore store = new PSqlStore(PSqlStore.getDefaultCfg())) {
-            grabber.init(store, currentScheduler, new SqlRuPostParser());
-            grabber.init(store, currentScheduler, new SqlRuPostParser(2, 3));
-            grabber.init(store, currentScheduler, new SqlRuPostParser(4, 4));
-            Thread.sleep(30000);
-            currentScheduler.pauseAll();
-            currentScheduler.shutdown();
-            grabber.web(grabber.getStore());
-        }
     }
 
     public static Properties getDefaultCfg() throws IOException {
@@ -119,16 +108,86 @@ public class Grabber implements Grab {
 
     /**
      * Вывод store на localhost, но уже посредством создания HttpServer
-     * cp866 - кодировка, чтобы победить рутекст
+     * getAll() из store получаем именно из лямбды exchange, потому что он
+     * отвечает за перезагрузку страницы(неточно) и т.к. нам нужны актуальные
+     * данные - пусть он их и апдейтит, а сам рефреш орагнизован через html
      */
     public void web(Store store) {
         try {
             int port = Integer.parseInt(cfg.getProperty("port"));
-            HttpPostsServer server = new HttpPostsServer(port, store.getAll());
-            LOG.debug("webServer was started http://localhost:{}/posts", port);
-            server.startServer();
+            HttpServer server = HttpServer.create(
+                    new InetSocketAddress("localhost", port), 0);
+            System.out.printf("http://localhost:%d/posts", port);
+            server.createContext("/posts", exchange -> {
+                var posts = store.getAll();
+                StringJoiner html = new StringJoiner(System.lineSeparator());
+                html.add("<!DOCTYPE html>");
+                html.add("<html>"); //HTML
+                html.add("<head>"); //HEAD
+                html.add("<meta charset=\"UTF-8\">");
+                html.add("<meta http-equiv=Refresh content=15 />");
+                html.add("<style type=\"text/css\">"); //Style
+                html.add("td {   font-size: 120%; \n"
+                                 + "    font-family: Times New " + "Roman;"
+                                 + "    color: Black;}");
+                html.add("th {   font-size: 200%;" + "color: Black;}");
+                html.add("body {background: NavajoWhite;}");
+                html.add("</style>"); // /Style
+                html.add("</head>");
+                html.add("<body>"); //BODY
+                html.add("<table cellpadding=30 border=10 align=center "
+                                 + " bgcolor=Bisque>");
+                html.add("<caption>");
+                html.add("<h1> Список вакансий <h1>");
+                html.add("</caption>");
+                html.add("<tr>");
+                html.add("<th>");
+                html.add("Дата публикации:");
+                html.add("</th>");
+                html.add("<th>");
+                html.add("Вакансия:");
+                html.add("</th>");
+                html.add("<th>");
+                html.add("Описание:");
+                html.add("</th>");
+                html.add("</tr>");
+                for (Post post : posts) {
+                    html.add("<tr>");
+                    html.add(String.format("<td align=center>%s</td>",
+                                           post.getCreated()));
+                    html.add(String.format("<td align=center>%s</td>",
+                                           post.getTopicName()));
+                    html.add(String.format("<td>%s</td>",
+                                           post.getDescription()));
+                    html.add("</tr>");
+                }
+                html.add("</table>");
+                html.add("</body>");
+                html.add("</html>");
+                byte[] data = html.toString()
+                                  .getBytes();
+                exchange.sendResponseHeaders(200, data.length);
+                try (var out = exchange.getResponseBody()) {
+                    out.write(data);
+                    out.flush();
+                }
+            });
+            server.setExecutor(null);
+            server.start();
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.error("web fell down", e);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        var grabber = new Grabber(getDefaultCfg());
+        Scheduler currentScheduler = grabber.scheduler();
+        try (PSqlStore store = new PSqlStore(PSqlStore.getDefaultCfg())) {
+            grabber.init(store, currentScheduler, new SqlRuPostParser());
+            grabber.init(store, currentScheduler, new SqlRuPostParser(2, 3));
+            grabber.init(store, currentScheduler, new SqlRuPostParser(4, 4));
+            grabber.web(store);
+            Thread.sleep(60000);
         }
     }
 }
