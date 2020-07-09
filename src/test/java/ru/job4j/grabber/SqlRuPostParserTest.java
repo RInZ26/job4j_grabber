@@ -44,8 +44,8 @@ public class SqlRuPostParserTest {
     @Test
     public void whenParsePostsBetweenIsOk() {
         SqlRuPostParser parser = new SqlRuPostParser();
-        var posts = parser.parsePostsBetween(1, 4, parser.getMainUrl());
-        assertThat(posts.size(), is(COUNT_OF_POSTS_PER_PAGE * 3));
+        var posts = parser.parsePostsBetween(1, 2, parser.getMainUrl());
+        assertThat(posts.size(), is(COUNT_OF_POSTS_PER_PAGE * 2));
     }
 
     @Test(expected = IllegalArgumentException.class)
