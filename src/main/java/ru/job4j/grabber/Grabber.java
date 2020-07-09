@@ -155,8 +155,9 @@ public class Grabber implements Grab {
                     html.add("<tr>");
                     html.add(String.format("<td align=center>%s</td>",
                                            post.getCreated()));
-                    html.add(String.format("<td align=center>%s</td>",
-                                           post.getTopicName()));
+                    html.add(String.format(
+                            "<td align=center> <a href=%s>%s </a> </td>",
+                            post.getTopicUrl(), post.getTopicName()));
                     html.add(String.format("<td>%s</td>",
                                            post.getDescription()));
                     html.add("</tr>");
