@@ -30,8 +30,9 @@ public class SqlRuPostParserTest {
     @Test
     public void whenParsePostIsOk() {
         SqlRuPostParser parser = new SqlRuPostParser();
-        var post = parser.parsePost("https://www.sql"
-                                            + ".ru/forum/1326595/inzhener-po-nagruzochnomu-testirovaniu");
+        var post = parser.parsePost(
+                "https://www.sql" + ".ru/forum/1326595/inzhener-po-"
+                        + "nagruzochnomu-testirovaniu");
         assertTrue(post.getDescription()
                        .contains("hr@bellintegrator.ru"));
         assertThat(post.getCreated(),
