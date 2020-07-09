@@ -21,8 +21,8 @@ public class SqlRuPostParser implements Parse {
     /**
      * Основная url, которую парсер умеет парсить
      */
-    private static final String MAIN_URL = "https://www.sql"
-            + ".ru/forum/job-offers/";
+    private static final String MAIN_URL =
+            "https://www.sql" + ".ru/forum/job-offers/";
     /**
      * Начало-конец парсинга
      */
@@ -41,7 +41,10 @@ public class SqlRuPostParser implements Parse {
      * Конструктор для реализации работы интерфейса
      */
     public SqlRuPostParser(int startPage, int finishPage) {
-        this.startPage = startPage;
+        if (startPage > finishPage) {
+            throw new IllegalArgumentException(
+                    "finishPage should be equal or " + "more than startPage");
+        }
         this.finishPage = finishPage;
     }
 
@@ -151,9 +154,7 @@ public class SqlRuPostParser implements Parse {
     @Override
     public List<Post> parsePostsBetween(int start, int finish, String url) {
         if (start < 0 || finish < 0 || finish < start || Objects.isNull(url)) {
-            LOG.warn("Неадекватные входные данные в parsePosts {} - {} - {}",
-                     start, finish, url);
-            return Collections.emptyList();
+            throw new IllegalArgumentException("Неадекватные входные данные");
         }
         var result = new ArrayList<Post>();
         StringBuilder defaultUrl = new StringBuilder(url);

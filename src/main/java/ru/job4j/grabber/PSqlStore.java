@@ -184,16 +184,4 @@ public class PSqlStore implements Store, AutoCloseable {
                         rs.getTimestamp("created")
                           .toLocalDateTime());
     }
-
-    public static void main(String[] args) {
-        try (var sqlStore = new PSqlStore(getDefaultCfg())) {
-            var sqlParser = new SqlRuPostParser();
-            sqlStore.saveAll(sqlParser.parsePostsBetween(1, 3,
-                                                         "https://www.sql.ru/forum/job-offers/"));
-            sqlStore.getAll()
-                    .forEach(System.out::println);
-        } catch (Exception e) {
-            LOG.error("main fell down", e);
-        }
-    }
 }
