@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.Properties;
 import java.util.StringJoiner;
 import java.util.function.Predicate;
@@ -111,6 +112,11 @@ public class Grabber implements Grab {
      * getAll() из store получаем именно из лямбды exchange, потому что он
      * отвечает за перезагрузку страницы(неточно) и т.к. нам нужны актуальные
      * данные - пусть он их и апдейтит, а сам рефреш орагнизован через html
+     *
+     * exchange.getResponseHeaders().put("Content-Type", List.of("text/html",
+     * "charset=UTF-8"));
+     * Нужная штука, так как подобная мета-информация нужна для поисковиков +
+     * мы, явно ещё раз говорим в каком формате серверу обрабатывать данные
      */
     public void web(Store store) {
         try {
@@ -167,6 +173,9 @@ public class Grabber implements Grab {
                 html.add("</html>");
                 byte[] data = html.toString()
                                   .getBytes();
+                exchange.getResponseHeaders()
+                        .put("Content-Type",
+                             List.of("text/html", "charset=UTF-8"));
                 exchange.sendResponseHeaders(200, data.length);
                 try (var out = exchange.getResponseBody()) {
                     out.write(data);
