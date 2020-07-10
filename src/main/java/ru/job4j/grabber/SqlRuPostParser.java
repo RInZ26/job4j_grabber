@@ -116,13 +116,6 @@ public class SqlRuPostParser implements Parse {
         return result;
     }
 
-    public static void main(String[] args) {
-        System.out.println(new SqlRuPostParser().parsePost(
-                "https://www.sql" + ".ru" + "/forum" + "/1326092"
-                        + "/rukovoditel-komandy-razrabotchikov")
-                                                .getDescription());
-    }
-
     /**
      * То самое извращение со String, чтобы как-то избавиться от плавающих
      * тагов [new]
