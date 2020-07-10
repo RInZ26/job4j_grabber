@@ -188,7 +188,7 @@ public class Grabber implements Grab {
             grabber.init(store, currentScheduler, new SqlRuPostParser(2, 3));
             grabber.init(store, currentScheduler, new SqlRuPostParser(4, 4));
             grabber.web(store);
-            Thread.sleep(60000);
+            Thread.sleep(Long.MAX_VALUE);
         }
     }
 }

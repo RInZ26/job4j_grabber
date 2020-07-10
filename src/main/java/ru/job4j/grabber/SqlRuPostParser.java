@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -106,11 +105,7 @@ public class SqlRuPostParser implements Parse {
                                 .get();
             Element table = doc.selectFirst(".msgTable");
             Element messageHeader = table.selectFirst(".messageHeader");
-            result.setDescription(table.select("tr")
-                                       .get(1)
-                                       .select("td")
-                                       .get(1)
-                                       .text());
+            result.setDescription(table.select(".msgBody").html());
             result.setTopicName(eraseTags(messageHeader.text()));
             result.setCreated(SqlRuDateParser.parseDate(eraseTags(
                     table.selectFirst(".msgFooter")
@@ -119,6 +114,13 @@ public class SqlRuPostParser implements Parse {
             LOG.error("Произошло что-то страшное в parsePost {}", pageUrl, e);
         }
         return result;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(new SqlRuPostParser().parsePost(
+                "https://www.sql" + ".ru" + "/forum" + "/1326092"
+                        + "/rukovoditel-komandy-razrabotchikov")
+                                                .getDescription());
     }
 
     /**
