@@ -123,7 +123,7 @@ public class Grabber implements Grab {
             int port = Integer.parseInt(cfg.getProperty("port"));
             HttpServer server = HttpServer.create(
                     new InetSocketAddress("localhost", port), 0);
-            System.out.printf("http://localhost:%d/posts", port);
+            System.out.printf("http://localhost:%d/posts\n", port);
             server.createContext("/posts", exchange -> {
                 var posts = store.getAll();
                 StringJoiner html = new StringJoiner(System.lineSeparator());
@@ -193,9 +193,7 @@ public class Grabber implements Grab {
         var grabber = new Grabber(getDefaultCfg());
         Scheduler currentScheduler = grabber.scheduler();
         try (PSqlStore store = new PSqlStore(PSqlStore.getDefaultCfg())) {
-            grabber.init(store, currentScheduler, new SqlRuPostParser());
             grabber.init(store, currentScheduler, new SqlRuPostParser(2, 3));
-            grabber.init(store, currentScheduler, new SqlRuPostParser(4, 4));
             grabber.web(store);
             Thread.sleep(Long.MAX_VALUE);
         }

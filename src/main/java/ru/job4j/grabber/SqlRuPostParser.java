@@ -44,6 +44,7 @@ public class SqlRuPostParser implements Parse {
             throw new IllegalArgumentException(
                     "finishPage should be equal or " + "more than startPage");
         }
+        this.startPage = startPage;
         this.finishPage = finishPage;
     }
 
