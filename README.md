@@ -8,3 +8,5 @@
 Использованные технологии: 
 - JDBC
 - Quartz
+
+![Imgur](https://i.imgur.com/ULUin87.png)
